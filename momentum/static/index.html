@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Momentum Video Stüdyosu</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #181b22; --line: #2a2f3a; --text: #eef0f4; --muted: #9aa1ad;
+    --accent: #ff7a45; --accent-2: #ffb547; --ok: #4cc38a; --err: #ff5c6c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.5px; }
+  h1 span { background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  label { display: block; font-weight: 600; margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+  textarea, select { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+                     border-radius: 10px; padding: 12px; font: inherit; }
+  textarea { min-height: 88px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+  .music-line { display: flex; gap: 8px; }
+  .music-line select { flex: 1; }
+  button, .btn { border: 0; border-radius: 10px; padding: 12px 18px; font: inherit; font-weight: 700;
+                 cursor: pointer; color: #1a1006; background: linear-gradient(90deg, var(--accent), var(--accent-2));
+                 text-decoration: none; display: inline-block; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: wait; }
+  #go { width: 100%; margin-top: 20px; font-size: 16px; }
+  .notice { margin-top: 12px; font-size: 13px; color: var(--accent-2); }
+  #status { margin-top: 24px; display: none; }
+  .steps { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .step { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .step.active { border-color: var(--accent); color: var(--text); }
+  .step.done { border-color: var(--ok); color: var(--ok); }
+  #message { font-weight: 600; }
+  #error { color: var(--err); margin-top: 8px; white-space: pre-wrap; }
+  .layout { display: grid; grid-template-columns: 1fr 300px; gap: 24px; margin-top: 16px; align-items: start; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .scene { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .scene .img { aspect-ratio: 9 / 16; background: linear-gradient(110deg, #1b1f27 30%, #262b36 50%, #1b1f27 70%);
+                background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+  .scene img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .scene .txt { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+  .scene .txt b { display: block; color: var(--text); font-size: 13px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .player video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 12px; }
+  .player .btn { width: 100%; text-align: center; margin-top: 10px; }
+  #videoTitle { font-size: 18px; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span>Momentum</span> Video Stüdyosu</h1>
+  <p class="sub">Konunu yaz; sahneler planlansın, görseller üretilsin ve 20 saniyelik dikey animasyonlu video hazırlansın.</p>
+
+  <form class="panel" id="form">
+    <label for="topic">Konu</label>
+    <textarea id="topic" required minlength="3" maxlength="500"
+      placeholder="Örn: Sabah 5'te kalkıp maratona hazırlanan genç bir kadının azmi"></textarea>
+    <div class="row">
+      <div>
+        <label for="style">Görsel stil</label>
+        <select id="style"></select>
+      </div>
+      <div>
+        <label for="music">Arka plan müziği</label>
+        <div class="music-line">
+          <select id="music"></select>
+          <button type="button" class="ghost" id="uploadBtn">Yükle</button>
+          <input type="file" id="musicFile" accept="audio/*" hidden>
+        </div>
+      </div>
+    </div>
+    <button id="go" type="submit">Video Oluştur</button>
+    <div class="notice" id="mockNotice" hidden>Deneme modu açık (MOMENTUM_MOCK=1): API çağrılmaz, yer tutucu görseller kullanılır.</div>
+  </form>
+
+  <section id="status" class="panel">
+    <div class="steps">
+      <span class="step" data-stage="planning">1 · Sahne planı</span>
+      <span class="step" data-stage="images">2 · Görseller</span>
+      <span class="step" data-stage="video">3 · Video</span>
+    </div>
+    <div id="message"></div>
+    <div id="error"></div>
+    <div class="layout">
+      <div>
+        <h2 id="videoTitle"></h2>
+        <div class="scenes" id="scenes"></div>
+      </div>
+      <div class="player" id="player" hidden>
+        <video id="video" controls playsinline loop></video>
+        <a class="btn" id="download" download>Videoyu indir</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const STYLE_NAMES = { sinematik: "Sinematik", anime: "Anime", "3d": "3D Animasyon", illustrasyon: "Dijital illüstrasyon", suluboya: "Suluboya" };
+const ORDER = ["planning", "images", "video", "done"];
+const $ = (id) => document.getElementById(id);
+let pollTimer = null;
+
+function fillMusic(list, selected) {
+  const sel = $("music");
+  sel.innerHTML = "";
+  sel.add(new Option("Müziksiz", ""));
+  if (list.length) sel.add(new Option("Rastgele", "random"));
+  list.forEach((name) => sel.add(new Option(name, name)));
+  if (selected) sel.value = selected;
+}
+
+async function loadOptions() {
+  const res = await fetch("/api/options");
+  const opts = await res.json();
+  opts.styles.forEach((s) => $("style").add(new Option(STYLE_NAMES[s] || s, s)));
+  fillMusic(opts.music);
+  $("mockNotice").hidden = !opts.mock;
+}
+
+$("uploadBtn").onclick = () => $("musicFile").click();
+$("musicFile").onchange = async () => {
+  const file = $("musicFile").files[0];
+  if (!file) return;
+  const body = new FormData();
+  body.append("file", file);
+  $("uploadBtn").disabled = true;
+  try {
+    const res = await fetch("/api/music", { method: "POST", body });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Yükleme başarısız");
+    fillMusic(data.music, data.name);
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    $("uploadBtn").disabled = false;
+    $("musicFile").value = "";
+  }
+};
+
+$("form").onsubmit = async (ev) => {
+  ev.preventDefault();
+  $("go").disabled = true;
+  $("status").style.display = "block";
+  $("player").hidden = true;
+  $("scenes").innerHTML = "";
+  $("videoTitle").textContent = "";
+  $("error").textContent = "";
+  $("message").textContent = "Başlatılıyor…";
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: $("topic").value, style: $("style").value, music: $("music").value || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Geçersiz istek");
+    poll(data.job_id);
+  } catch (e) {
+    $("error").textContent = e.message;
+    $("go").disabled = false;
+  }
+};
+
+function poll(jobId) {
+  clearTimeout(pollTimer);
+  fetch(`/api/jobs/${jobId}`)
+    .then((r) => r.json())
+    .then((job) => {
+      render(job);
+      if (job.stage === "done" || job.stage === "error") $("go").disabled = false;
+      else pollTimer = setTimeout(() => poll(jobId), 1500);
+    })
+    .catch(() => { pollTimer = setTimeout(() => poll(jobId), 3000); });
+}
+
+function render(job) {
+  $("message").textContent = job.message;
+  $("error").textContent = job.error || "";
+  $("videoTitle").textContent = job.video_title || "";
+  const current = ORDER.indexOf(job.stage);
+  document.querySelectorAll(".step").forEach((el) => {
+    const idx = ORDER.indexOf(el.dataset.stage);
+    el.className = "step" + (job.stage === "done" || idx < current ? " done" : idx === current ? " active" : "");
+  });
+
+  const box = $("scenes");
+  job.scenes.forEach((scene, i) => {
+    let card = box.children[i];
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "scene";
+      card.innerHTML = `<div class="img"></div><div class="txt"><b></b><span></span></div>`;
+      card.querySelector("b").textContent = `${i + 1}. ${scene.title}`;
+      card.querySelector("span").textContent = scene.description;
+      box.appendChild(card);
+    }
+    const src = job.images[i];
+    if (src && !card.querySelector("img")) {
+      const img = new Image();
+      img.src = src;
+      img.alt = scene.title;
+      card.querySelector(".img").replaceChildren(img);
+      card.querySelector(".img").style.animation = "none";
+    }
+  });
+
+  if (job.video && $("player").hidden) {
+    const url = `${job.video}?t=${Date.now()}`;
+    $("video").src = url;
+    $("download").href = job.video;
+    $("download").setAttribute("download", `momentum-${job.id}.mp4`);
+    $("player").hidden = false;
+  }
+}
+
+loadOptions();
+</script>
+</body>
+</html>
